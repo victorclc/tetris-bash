@@ -26,6 +26,12 @@ tetrominos=(
 # GAME STATE VARIABLES
 
 declare playing_field 
+declare current_piece_index
+declare current_piece_rotation
+declare current_piece_pos_x
+declare current_piece_pos_y
+
+declare FILLED_LINE
 
 
 function replace_char() {
@@ -38,11 +44,15 @@ function replace_char() {
     echo $new_string
 }
 
-function init() {
+function initializize_new_piece {
     current_piece_index=$((RANDOM % 7))
     current_piece_rotation=0 # 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees
     current_piece_pos_y=0
-    current_piece_pos_x=3 # FIELD_WIDTH / 5
+    current_piece_pos_x=3
+}
+
+function init() {
+    initializize_new_piece
 
     for ((x = 0; x < $((FIELD_WIDTH * FIELD_HEIGHT)); x++)); do
         playing_field+="0"
@@ -58,13 +68,20 @@ function init() {
             fi
         done
     done
+    
+    for ((x = 0; x < $FIELD_WIDTH; x++)); do
+        if (( x == 0 || x == FIELD_WIDTH - 1 )); then
+            FILLED_LINE+="9"
+        else 
+            FILLED_LINE+="1"
+        fi
+    done
 }
 
 function tick() {
-    sleep $TICK_DELAY
     while true; do 
-        echo -n $CMD_DOWN 
         sleep $TICK_DELAY
+        echo -n $CMD_DOWN 
     done
 }
 
@@ -100,6 +117,7 @@ function draw_board() {
     for ((y = 0; y < $FIELD_HEIGHT; y++)); do
         board_view[$y]=${playing_field:y*FIELD_WIDTH:FIELD_WIDTH}
     done
+
     for px in {0..3}; do
         for py in {0..3}; do
             rotate $px $py $current_piece_rotation
@@ -109,7 +127,7 @@ function draw_board() {
             fi
         done
     done
-    # screen[(nCurrentY + py + 2)*nScreenWidth + (nCurrentX + px + 2)] = nCurrentPiece
+
     for line in "${board_view[@]}"; do
         line=$(echo -e ${line//0/". "})
         line=$(echo -e ${line//1/"[]"})
@@ -125,23 +143,40 @@ function input_reader() {
     done
 }
 
+function handle_complete_lines() {
+    declare -a lines 
+    for ((y = 0; y < $FIELD_HEIGHT; y++)); do
+        lines[$y]=${playing_field:y*FIELD_WIDTH:FIELD_WIDTH}
+    done
+
+    for line in "${lines[@]}"; do
+        if [[ $line == $FILLED_LINE ]]; then
+            exit 1
+        fi
+
+    done
+
+}
+
+function lock_current_piece {
+    for px in {0..3}; do
+        for py in {0..3}; do
+            rotate $px $py $current_piece_rotation
+            local index=$?
+            if [[ ${tetrominos[$current_piece_index]:$index:1} == 1 ]]; then
+                playing_field=$(replace_char $playing_field $(( (current_piece_pos_y + py) * FIELD_WIDTH + (current_piece_pos_x + px) )) 1)
+            fi
+        done
+    done
+}
+
 function move_down() {
     if does_piece_fit $current_piece_index $current_piece_rotation $current_piece_pos_x $((current_piece_pos_y + 1)); then
         ((current_piece_pos_y++))
     else
-        for px in {0..3}; do
-            for py in {0..3}; do
-                rotate $px $py $current_piece_rotation
-                local index=$?
-                if [[ ${tetrominos[$current_piece_index]:$index:1} == 1 ]]; then
-                    playing_field=$(replace_char $playing_field $(( (current_piece_pos_y + py) * FIELD_WIDTH + (current_piece_pos_x + px) )) 1)
-                fi
-            done
-        done
-        current_piece_index=$((RANDOM % 7))
-        current_piece_rotation=0 # 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees
-        current_piece_pos_y=0
-        current_piece_pos_x=3
+        lock_current_piece
+        handle_complete_lines
+        initializize_new_piece
     fi
 }
 
@@ -163,7 +198,6 @@ function rotate_piece() {
         current_piece_rotation=$(( (current_piece_rotation + 1) % 4 ))
     fi
 }
-
 
 function rotate() {
     local piece_x=$1
@@ -206,7 +240,6 @@ function does_piece_fit() {
             fi
         done
     done
-
     return 0
 }
 
