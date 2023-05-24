@@ -25,11 +25,6 @@ tetrominos=(
 
 # GAME STATE VARIABLES
 
-current_piece_index=$((RANDOM % 7))
-current_piece_rotation=0 # 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees
-current_piece_pos_y=0
-current_piece_pos_x=3 # FIELD_WIDTH / 5
-
 declare playing_field 
 
 
@@ -44,9 +39,15 @@ function replace_char() {
 }
 
 function init() {
+    current_piece_index=$((RANDOM % 7))
+    current_piece_rotation=0 # 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees
+    current_piece_pos_y=0
+    current_piece_pos_x=3 # FIELD_WIDTH / 5
+
     for ((x = 0; x < $((FIELD_WIDTH * FIELD_HEIGHT)); x++)); do
         playing_field+="0"
     done
+
     for ((x = 0; x < $FIELD_WIDTH; x++)); do
         for ((y = 0; y < $FIELD_HEIGHT; y++)); do
             local index=$((y * FIELD_WIDTH + x))
@@ -127,25 +128,39 @@ function input_reader() {
 function move_down() {
     if does_piece_fit $current_piece_index $current_piece_rotation $current_piece_pos_x $((current_piece_pos_y + 1)); then
         ((current_piece_pos_y++))
+    else
+        for px in {0..3}; do
+            for py in {0..3}; do
+                rotate $px $py $current_piece_rotation
+                local index=$?
+                if [[ ${tetrominos[$current_piece_index]:$index:1} == 1 ]]; then
+                    playing_field=$(replace_char $playing_field $(( (current_piece_pos_y + py) * FIELD_WIDTH + (current_piece_pos_x + px) )) 1)
+                fi
+            done
+        done
+        current_piece_index=$((RANDOM % 7))
+        current_piece_rotation=0 # 0 = 0 degrees, 1 = 90 degrees, 2 = 180 degrees, 3 = 270 degrees
+        current_piece_pos_y=0
+        current_piece_pos_x=3
     fi
 }
 
 
 function move_right() {
-    if does_piece_fit $current_piece_index $current_piece_rotation $(current_piece_pos_x - 1) $current_piece_pos_y; then
+    if does_piece_fit $current_piece_index $current_piece_rotation $((current_piece_pos_x + 1)) $current_piece_pos_y; then
         ((current_piece_pos_x++))
     fi
 }
 
 function move_left() {
-    if does_piece_fit $current_piece_index $current_piece_rotation $(current_piece_pos_x - 1) $current_piece_pos_y; then
+    if does_piece_fit $current_piece_index $current_piece_rotation $((current_piece_pos_x - 1)) $current_piece_pos_y; then
         ((current_piece_pos_x--))
     fi
 }
 
 function rotate_piece() {
-    if does_piece_fit $current_piece_index $(((current_piece_rotation + 1) % 4)) $urrent_piece_pos_x $current_piece_pos_y; then
-        current_piece_rotation=$(((current_piece_rotation + 1) % 4))
+    if does_piece_fit $current_piece_index $(( (current_piece_rotation + 1) % 4 )) $current_piece_pos_x $current_piece_pos_y; then
+        current_piece_rotation=$(( (current_piece_rotation + 1) % 4 ))
     fi
 }
 
@@ -184,14 +199,10 @@ function does_piece_fit() {
         for piece_y in {0..3}; do
             rotate $piece_x $piece_y $rotation
             local piece_index=$?
-            local field_index=$(((piece_pos_y + piece_y) * FIELD_WIDTH + (piece_pos_x + piece_x)))
+            local field_index=$(( (piece_pos_y + piece_y) * FIELD_WIDTH + (piece_pos_x + piece_x) ))
 
-            if [[ $((piece_pos_x + piece_x >= 0)) && $((piece_pos_x + piece_x < FIELD_WIDTH)) ]]; then
-                if [[ $((piece_pos_y + piece_y >= 0)) && $((piece_pos_y + piece_y < FIELD_HEIGHT)) ]]; then
-                    if [[ ${tetrominos[$piece]:$piece_index:1} == 1 && ${playing_field:$field_index:1} != 0 ]]; then
-                        return 1
-                    fi
-                fi
+            if [[ ${tetrominos[$piece]:$piece_index:1} -eq 1 && ${playing_field:$field_index:1} -ne 0 ]]; then
+                return 1
             fi
         done
     done
