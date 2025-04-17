@@ -144,17 +144,48 @@ function input_reader() {
 }
 
 function handle_complete_lines() {
-    declare -a lines 
+    # Split playing_field into rows
+    declare -a rows
     for ((y = 0; y < $FIELD_HEIGHT; y++)); do
-        lines[$y]=${playing_field:y*FIELD_WIDTH:FIELD_WIDTH}
+        rows[$y]=${playing_field:y*FIELD_WIDTH:FIELD_WIDTH}
     done
 
-    for line in "${lines[@]}"; do
-        if [[ $line == $FILLED_LINE ]]; then
-            exit 1
+    # Save the floor row separately
+    local floor_row=${rows[$((FIELD_HEIGHT-1))]}
+
+    # Collect non-complete rows (excluding the floor)
+    declare -a remaining
+    for ((y = 0; y < $FIELD_HEIGHT - 1; y++)); do
+        if [[ "${rows[$y]}" != "$FILLED_LINE" ]]; then
+            remaining+=("${rows[$y]}")
         fi
-
     done
+
+    # Compute number of cleared lines
+    local cleared=$(( FIELD_HEIGHT - 1 - ${#remaining[@]} ))
+    if (( cleared > 0 )); then
+        # Build an empty row (walls at edges, empty inside)
+        local empty_row=""
+        for ((x = 0; x < $FIELD_WIDTH; x++)); do
+            if (( x == 0 || x == FIELD_WIDTH - 1 )); then
+                empty_row+="9"
+            else
+                empty_row+="0"
+            fi
+        done
+
+        # Prepend empty rows for each cleared line
+        for ((i = 0; i < cleared; i++)); do
+            remaining=( "$empty_row" "${remaining[@]}" )
+        done
+
+        # Rebuild playing_field with remaining rows + floor
+        playing_field=""
+        for ((i = 0; i < $FIELD_HEIGHT - 1; i++)); do
+            playing_field+="${remaining[$i]}"
+        done
+        playing_field+="$floor_row"
+    fi
 
 }
 
