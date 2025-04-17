@@ -32,6 +32,7 @@ declare current_piece_pos_x
 declare current_piece_pos_y
 
 declare FILLED_LINE
+declare score
 
 
 function replace_char() {
@@ -53,6 +54,7 @@ function initializize_new_piece {
 
 function init() {
     initializize_new_piece
+    score=0
 
     for ((x = 0; x < $((FIELD_WIDTH * FIELD_HEIGHT)); x++)); do
         playing_field+="0"
@@ -112,6 +114,7 @@ function controller() {
 
 function draw_board() {
     clear
+    echo "Score: $score"
     declare -a board_view
 
     for ((y = 0; y < $FIELD_HEIGHT; y++)); do
@@ -164,6 +167,13 @@ function handle_complete_lines() {
     # Compute number of cleared lines
     local cleared=$(( FIELD_HEIGHT - 1 - ${#remaining[@]} ))
     if (( cleared > 0 )); then
+        # Update score for cleared lines
+        case $cleared in
+            1) score=$((score+40)) ;;
+            2) score=$((score+100)) ;;
+            3) score=$((score+300)) ;;
+            4) score=$((score+1200)) ;;
+        esac
         # Build an empty row (walls at edges, empty inside)
         local empty_row=""
         for ((x = 0; x < $FIELD_WIDTH; x++)); do
